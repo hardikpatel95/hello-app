@@ -1,0 +1,38 @@
+name: CI/CD — build and deploy to Minikube
+
+on:
+  push:
+    branches:
+      - main          # runs on every push to main
+
+jobs:
+  deploy:
+    runs-on: self-hosted    # use YOUR laptop, not GitHub's cloud runners
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Minikube Docker environment
+        run: |
+          eval $(minikube docker-env)
+          echo "DOCKER_TLS_VERIFY=$DOCKER_TLS_VERIFY" >> $GITHUB_ENV
+          echo "DOCKER_HOST=$DOCKER_HOST" >> $GITHUB_ENV
+          echo "DOCKER_CERT_PATH=$DOCKER_CERT_PATH" >> $GITHUB_ENV
+
+      - name: Build Docker image
+        run: |
+          eval $(minikube docker-env)
+          docker build -t hello-app:latest .
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl rollout restart deployment/hello-app
+          kubectl rollout status deployment/hello-app --timeout=120s
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods
+          kubectl get services
